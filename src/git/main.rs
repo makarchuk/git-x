@@ -2,7 +2,7 @@ use crate::errors::*;
 use crate::git::cmd::GitCommand;
 use std::process;
 
-pub fn main() -> Result<String> {
+pub fn main() -> TResult<String> {
     let stdout = GitCommand::new(["remote", "show", "origin"])?.execute()?;
 
     Ok(stdout

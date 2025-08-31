@@ -5,7 +5,7 @@ pub struct GitCommand {
 }
 
 impl GitCommand {
-    pub fn new<S: AsRef<std::ffi::OsStr>, I: IntoIterator<Item = S>>(args: I) -> Result<Self> {
+    pub fn new<S: AsRef<std::ffi::OsStr>, I: IntoIterator<Item = S>>(args: I) -> TResult<Self> {
         Ok(Self {
             args: args
                 .into_iter()
@@ -15,7 +15,7 @@ impl GitCommand {
         })
     }
 
-    pub fn execute(&self) -> Result<String> {
+    pub fn execute(&self) -> TResult<String> {
         let result = std::process::Command::new("git").args(&self.args).output();
 
         match result {

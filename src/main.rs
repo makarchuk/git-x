@@ -1,5 +1,6 @@
 pub mod errors;
 pub mod git;
+pub mod gitlab;
 
 use std::process::exit;
 
@@ -12,7 +13,14 @@ fn main() {
         Command::Main => match git::main() {
             Ok(output) => println!("{}", output),
             Err(err) => {
-                err.print();
+                println!("Failed: {}", err.print());
+                exit(1);
+            }
+        },
+        Command::MR(mr) => match gitlab::mr(mr) {
+            Ok(output) => println!("Ok: {}", output),
+            Err(err) => {
+                println!("Failed: {}", err.print());
                 exit(1);
             }
         },
@@ -30,4 +38,5 @@ struct Cli {
 #[derive(Debug, clap::Subcommand)]
 enum Command {
     Main,
+    MR(gitlab::MR),
 }

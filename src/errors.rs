@@ -1,4 +1,4 @@
-pub type Result<T> = std::result::Result<T, Error>;
+pub type TResult<T> = std::result::Result<T, Error>;
 
 pub type StdResult<T, E: std::error::Error> = std::result::Result<T, E>;
 
@@ -35,13 +35,13 @@ pub fn git_error(output: std::process::Output, args: Vec<String>) -> Error {
 
 pub trait ToGeneric {
     type Ok;
-    fn to_generic(self) -> Result<Self::Ok>;
+    fn to_generic(self) -> TResult<Self::Ok>;
 }
 
 impl<T, E: std::error::Error> ToGeneric for std::result::Result<T, E> {
     type Ok = T;
 
-    fn to_generic(self) -> Result<T> {
+    fn to_generic(self) -> TResult<T> {
         match self {
             Ok(val) => Ok(val),
             Err(err) => Err(Error::Generic(err.to_string())),
