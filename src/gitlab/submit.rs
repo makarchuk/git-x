@@ -20,8 +20,11 @@ pub fn execute_submit(
     _ = GitCommand::new(["checkout", "-b", &new_branch_name])?.execute()?;
     _ = GitCommand::new(["commit", "-m", &submit_args.message])?.execute()?;
     _ = GitCommand::new(["push", "--set-upstream", "origin", &new_branch_name])?.execute()?;
-    let mr_url = git_context
+    let mr = git_context
         .gitlab_client
         .create_merge_request(&new_branch_name, &submit_args.message)?;
-    Ok(format!("Merge Request Succesfully created!\n{}", mr_url))
+    Ok(format!(
+        "Create new Merge Request!\n{} `{}` \n{}",
+        mr.id, mr.title, mr.web_url
+    ))
 }

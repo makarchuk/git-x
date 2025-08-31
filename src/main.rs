@@ -30,7 +30,7 @@ fn main() {
             }
         },
         Command::MR(mr) => match gitlab::mr(mr) {
-            Ok(output) => println!("Ok: {}", output),
+            Ok(output) => println!("{}", output),
             Err(err) => {
                 println!("Failed: {}", err.print());
                 exit(1);

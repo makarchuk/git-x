@@ -32,7 +32,7 @@ impl GitlabProjectClient {
 }
 
 impl GitlabProjectClient {
-    pub fn create_merge_request(&self, branch: &str, title: &str) -> TResult<String> {
+    pub fn create_merge_request(&self, branch: &str, title: &str) -> TResult<MergeRequest> {
         let mr: CreateMergeRequestResponse =
             gitlab::api::projects::merge_requests::CreateMergeRequest::builder()
                 .project(&self.project)
@@ -44,10 +44,10 @@ impl GitlabProjectClient {
                 .with_comment("failed to build create merge request API call")?
                 .query(&self.client)
                 .with_comment("failed to create merge request")?;
-        Ok(mr.mr.web_url)
+        Ok(mr.mr)
     }
 
-    pub fn get_merge_requestse_by_branch(&self, branch: &str) -> TResult<Vec<String>> {
+    pub fn get_merge_requestse_by_branch(&self, branch: &str) -> TResult<Vec<MergeRequest>> {
         let mrs: Vec<ListMergeRequestsResponseItem> = gitlab::api::paged(
             gitlab::api::projects::merge_requests::MergeRequests::builder()
                 .project(&self.project)
@@ -59,7 +59,7 @@ impl GitlabProjectClient {
         .query(&self.client)
         .with_comment("failed to get merge requests")?;
         //todo: paginate
-        Ok(mrs.into_iter().map(|mr| mr.mr.web_url).collect())
+        Ok(mrs.into_iter().map(|mr| mr.mr).collect())
     }
 }
 
@@ -68,7 +68,7 @@ impl GitlabProjectClient {
 #[derive(serde::Deserialize, Debug)]
 struct CreateMergeRequestResponse {
     #[serde(flatten)]
-    mr: ResponseMergeRequest,
+    mr: MergeRequest,
 }
 
 //Very much incomplete structure. Consult the docs if you need additional fields available
@@ -76,15 +76,15 @@ struct CreateMergeRequestResponse {
 #[derive(serde::Deserialize, Debug)]
 struct ListMergeRequestsResponseItem {
     #[serde(flatten)]
-    mr: ResponseMergeRequest,
+    mr: MergeRequest,
 }
 
 #[derive(serde::Deserialize, Debug)]
-struct ResponseMergeRequest {
-    id: u64,
-    iid: u64,
-    title: String,
-    description: Option<String>,
-    state: String,
-    web_url: String,
+pub struct MergeRequest {
+    pub id: u64,
+    pub iid: u64,
+    pub title: String,
+    pub description: Option<String>,
+    pub state: String,
+    pub web_url: String,
 }

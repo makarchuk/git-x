@@ -8,26 +8,26 @@ pub fn execute_view(ctx: &crate::gitlab::GitContext) -> TResult<String> {
         .to_owned();
     crate::log_debug!("Current branch: {}", current_branch);
 
-    let links = ctx
+    let mrs = ctx
         .gitlab_client
         .get_merge_requestse_by_branch(&current_branch)?;
 
-    match links.len() {
+    match mrs.len() {
         0 => Ok(format!("No mrs found for branch: {}", current_branch).to_string()),
-        1 => match open::that(&links[0]) {
+        1 => match open::that(&mrs[0].web_url) {
             Ok(()) => Ok(format!(
-                "Opening merge request for branch {}: {}",
-                current_branch, links[0]
+                "Opening Merge Request !{} `{}`: {}",
+                mrs[0].id, mrs[0].title, mrs[0].web_url
             )),
             Err(e) => Ok(format!(
-                "Merge request found for branch {}: {}\nFailed to open in browser: {}",
-                current_branch, links[0], e
+                "Merge request found !{} `{}`: {}\nFailed to open in browser: {}",
+                mrs[0].id, mrs[0].title, mrs[0].web_url, e
             )),
         },
         n => {
             let mut result = format!("Found {} mrs for branch {}:\n", n, current_branch);
-            for link in links {
-                result.push_str(&format!(" - {}\n", link));
+            for mr in mrs {
+                result.push_str(&format!(" - !{} `{}`: {}\n", mr.id, mr.title, mr.web_url));
             }
             Ok(result)
         }
