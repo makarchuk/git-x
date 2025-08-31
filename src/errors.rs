@@ -1,6 +1,6 @@
 pub type TResult<T> = std::result::Result<T, Error>;
 
-pub type StdResult<T, E: std::error::Error> = std::result::Result<T, E>;
+pub type StdResult<T, E> = std::result::Result<T, E>;
 
 #[derive(Debug)]
 pub enum Error {
@@ -17,13 +17,27 @@ pub struct GitError {
 impl Error {
     pub fn print(&self) -> String {
         match &self {
-            Error::Git(err) => format!(
-                "Git command failed\n git {}\n Status Code: {:#?}\nStdout: {}\nStderr: {}",
-                err.args.join(" "),
-                err.output.status.code(),
-                String::from_utf8_lossy(&err.output.stdout),
-                String::from_utf8_lossy(&err.output.stderr),
-            ),
+            Error::Git(err) => {
+                let mut error = format!(
+                    "Git command failed\n git {}\n Status Code: {:?}",
+                    err.args.join(" "),
+                    err.output.status.code()
+                );
+                if err.output.stdout.len() > 0 {
+                    error.push_str(&format!(
+                        "\n Stdout: {}",
+                        String::from_utf8_lossy(&err.output.stdout)
+                    ));
+                }
+                if err.output.stderr.len() > 0 {
+                    error.push_str(&format!(
+                        "\n Stderr: {}",
+                        String::from_utf8_lossy(&err.output.stderr)
+                    ));
+                }
+                error
+            }
+
             Error::Generic(msg) => format!("Error: {}", msg),
         }
     }

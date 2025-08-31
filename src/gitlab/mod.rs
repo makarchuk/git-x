@@ -1,3 +1,5 @@
+#![warn(unused_extern_crates)]
+
 mod client;
 mod config;
 mod submit;
@@ -27,7 +29,7 @@ enum Subcommand {
 pub fn mr(mr: &MR) -> TResult<String> {
     let remote_url = get_remote_url()?;
     let git_context = get_execution_context(&remote_url)?;
-    dbg!(&git_context);
+    crate::log_debug!("{:?}", &git_context);
 
     match &mr.command {
         Subcommand::Submit(submit_args) => submit::execute_submit(git_context, submit_args),

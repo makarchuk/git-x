@@ -19,8 +19,11 @@ impl GitlabProjectClient {
         project: String,
         private_token: config::SecretString,
     ) -> TResult<Self> {
-        let client = gitlab::Gitlab::new(base_url, private_token.to_str())
-            .with_comment("failed to initialize gitlab client")?;
+        let client = gitlab::GitlabBuilder::new(base_url, private_token.to_str())
+            .cert_insecure()
+            .build()
+            .with_comment("failed to build gitlab client")?;
+
         Ok(GitlabProjectClient {
             project: project,
             client: client,

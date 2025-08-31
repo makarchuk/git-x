@@ -1,6 +1,7 @@
 use std::time::Instant;
 
 use crate::errors::*;
+use crate::log_git;
 
 pub struct GitCommand {
     args: Vec<String>,
@@ -27,11 +28,11 @@ impl GitCommand {
             )?;
 
         let duration = start_time.elapsed();
-        println!(
+        log_git!(
             "[debug] `git {}` done {:?}. Result: {:#?}",
             self.args.join(" "),
             duration,
-            output.status.code()
+            output.status.code(),
         );
 
         match output.status.success() {
