@@ -5,3 +5,7 @@ edition = "2024"
 
 [dependencies]
 clap = {version="4.5.46", features=["derive"]}
+gitlab = "0.1802.1"
+gix-url = "0.32.0"
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = "1.0.143"

@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use crate::errors::*;
 
 pub struct GitCommand {
@@ -16,17 +18,25 @@ impl GitCommand {
     }
 
     pub fn execute(&self) -> TResult<String> {
-        let result = std::process::Command::new("git").args(&self.args).output();
+        let start_time = Instant::now();
+        let output = std::process::Command::new("git")
+            .args(&self.args)
+            .output()
+            .with_comment(
+                format!("Failed to execute git command: git {}", self.args.join(" ")).as_str(),
+            )?;
 
-        match result {
-            Err(e) => Err(Error::Generic(format!(
-                "Failed to execute git command: {}",
-                e
-            ))),
-            Ok(output) => match output.status.success() {
-                true => Ok(String::from_utf8_lossy(&output.stdout).into_owned()),
-                false => Err(git_error(output, self.args.clone())),
-            },
+        let duration = start_time.elapsed();
+        println!(
+            "[debug] `git {}` done {:?}. Result: {:#?}",
+            self.args.join(" "),
+            duration,
+            output.status.code()
+        );
+
+        match output.status.success() {
+            true => Ok(String::from_utf8_lossy(&output.stdout).into_owned()),
+            false => Err(git_error(output, self.args.clone())),
         }
     }
 }

@@ -1,5 +1,2 @@
-mod cmd;
-pub use cmd::*;
-
-mod main;
-pub use main::main;
+pub mod cmd;
+pub mod main;

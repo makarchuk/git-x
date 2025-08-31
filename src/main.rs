@@ -10,7 +10,7 @@ fn main() {
     let cli = Cli::parse();
 
     match &cli.commands {
-        Command::Main => match git::main() {
+        Command::Main => match git::main::main() {
             Ok(output) => println!("{}", output),
             Err(err) => {
                 println!("Failed: {}", err.print());

@@ -36,6 +36,7 @@ pub fn git_error(output: std::process::Output, args: Vec<String>) -> Error {
 pub trait ToGeneric {
     type Ok;
     fn to_generic(self) -> TResult<Self::Ok>;
+    fn with_comment(self, comment: &str) -> TResult<Self::Ok>;
 }
 
 impl<T, E: std::error::Error> ToGeneric for std::result::Result<T, E> {
@@ -45,6 +46,13 @@ impl<T, E: std::error::Error> ToGeneric for std::result::Result<T, E> {
         match self {
             Ok(val) => Ok(val),
             Err(err) => Err(Error::Generic(err.to_string())),
+        }
+    }
+
+    fn with_comment(self, comment: &str) -> TResult<T> {
+        match self {
+            Ok(val) => Ok(val),
+            Err(err) => Err(Error::Generic(format!("{}: {}", comment, err))),
         }
     }
 }
