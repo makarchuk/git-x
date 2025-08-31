@@ -44,7 +44,22 @@ impl GitlabProjectClient {
                 .with_comment("failed to build create merge request API call")?
                 .query(&self.client)
                 .with_comment("failed to create merge request")?;
-        Ok(mr.web_url)
+        Ok(mr.mr.web_url)
+    }
+
+    pub fn get_merge_requestse_by_branch(&self, branch: &str) -> TResult<Vec<String>> {
+        let mrs: Vec<ListMergeRequestsResponseItem> = gitlab::api::paged(
+            gitlab::api::projects::merge_requests::MergeRequests::builder()
+                .project(&self.project)
+                .source_branch(branch)
+                .build()
+                .with_comment("failed to build get merge requests API call")?,
+            gitlab::api::Pagination::Limit(200),
+        )
+        .query(&self.client)
+        .with_comment("failed to get merge requests")?;
+        //todo: paginate
+        Ok(mrs.into_iter().map(|mr| mr.mr.web_url).collect())
     }
 }
 
@@ -52,5 +67,24 @@ impl GitlabProjectClient {
 // https://docs.gitlab.com/api/merge_requests/#create-mr
 #[derive(serde::Deserialize, Debug)]
 struct CreateMergeRequestResponse {
+    #[serde(flatten)]
+    mr: ResponseMergeRequest,
+}
+
+//Very much incomplete structure. Consult the docs if you need additional fields available
+// https://docs.gitlab.com/api/merge_requests/#list-project-merge-requests
+#[derive(serde::Deserialize, Debug)]
+struct ListMergeRequestsResponseItem {
+    #[serde(flatten)]
+    mr: ResponseMergeRequest,
+}
+
+#[derive(serde::Deserialize, Debug)]
+struct ResponseMergeRequest {
+    id: u64,
+    iid: u64,
+    title: String,
+    description: Option<String>,
+    state: String,
     web_url: String,
 }

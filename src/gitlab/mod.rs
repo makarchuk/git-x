@@ -3,6 +3,7 @@
 mod client;
 mod config;
 mod submit;
+mod view;
 
 use crate::errors::*;
 use crate::git::cmd::GitCommand;
@@ -24,6 +25,7 @@ pub struct MR {
 #[derive(Debug, clap::Subcommand)]
 enum Subcommand {
     Submit(submit::SubmitArgs),
+    View,
 }
 
 pub fn mr(mr: &MR) -> TResult<String> {
@@ -32,7 +34,8 @@ pub fn mr(mr: &MR) -> TResult<String> {
     crate::log_debug!("{:?}", &git_context);
 
     match &mr.command {
-        Subcommand::Submit(submit_args) => submit::execute_submit(git_context, submit_args),
+        Subcommand::Submit(submit_args) => submit::execute_submit(&git_context, submit_args),
+        Subcommand::View => view::execute_view(&git_context),
     }
 }
 

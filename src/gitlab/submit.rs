@@ -8,7 +8,7 @@ pub struct SubmitArgs {
 }
 
 pub fn execute_submit(
-    git_context: crate::gitlab::GitContext,
+    git_context: &crate::gitlab::GitContext,
     submit_args: &SubmitArgs,
 ) -> TResult<String> {
     _ = GitCommand::new(["add", "--all"])?.execute()?;
