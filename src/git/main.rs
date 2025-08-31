@@ -19,7 +19,10 @@ pub fn main() -> TResult<String> {
         .filter(|line| line.starts_with("HEAD branch"))
         .map(|line| line.strip_prefix("HEAD branch: "))
         .next()
-        .unwrap() // .expect("failed to get default branch")
-        .unwrap() // .expect("failed to get default branch")
+        .flatten()
+        .ok_or(Error::Generic(format!(
+            "failed to prase default branch from git output.\n {}",
+            stdout
+        )))?
         .to_owned())
 }
