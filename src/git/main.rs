@@ -1,15 +1,11 @@
+use crate::errors::*;
+use crate::git::cmd::GitCommand;
 use std::process;
 
-pub fn main() -> String {
-    let result = process::Command::new("git")
-        .args(["remote", "show", "origin"])
-        .output()
-        .unwrap();
-    if !result.status.success() {
-        panic!("Git command failed");
-    };
+pub fn main() -> Result<String> {
+    let stdout = GitCommand::new(["remote", "show", "origin"])?.execute()?;
 
-    String::from_utf8_lossy(&result.stdout)
+    Ok(stdout
         .lines()
         .map(|line| line.trim_ascii())
         .filter(|line| line.starts_with("HEAD branch"))
@@ -17,5 +13,5 @@ pub fn main() -> String {
         .next()
         .unwrap() // .expect("failed to get default branch")
         .unwrap() // .expect("failed to get default branch")
-        .to_owned()
+        .to_owned())
 }

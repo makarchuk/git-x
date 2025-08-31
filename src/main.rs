@@ -1,4 +1,7 @@
+pub mod errors;
 pub mod git;
+
+use std::process::exit;
 
 use clap::{self, Parser};
 
@@ -6,10 +9,13 @@ fn main() {
     let cli = Cli::parse();
 
     match &cli.commands {
-        Command::Main => {
-            let output = git::main();
-            println!("{}", output);
-        }
+        Command::Main => match git::main() {
+            Ok(output) => println!("{}", output),
+            Err(err) => {
+                err.print();
+                exit(1);
+            }
+        },
     }
 }
 
