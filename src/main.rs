@@ -1,7 +1,7 @@
 pub mod errors;
-pub mod global;
 pub mod git;
 pub mod gitlab;
+pub mod global;
 
 use std::process::exit;
 
