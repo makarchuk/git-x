@@ -61,6 +61,17 @@ impl GitlabProjectClient {
         //todo: paginate
         Ok(mrs.into_iter().map(|mr| mr.mr).collect())
     }
+
+    pub fn get_merge_request(&self, mr: u64) -> TResult<MergeRequest> {
+        let mr: MergeRequest = gitlab::api::projects::merge_requests::MergeRequest::builder()
+            .project(&self.project)
+            .merge_request(mr)
+            .build()
+            .with_comment("failed to build get merge request API call")?
+            .query(&self.client)
+            .with_comment("failed to get merge request")?;
+        Ok(mr)
+    }
 }
 
 //Very much incomplete structure. Consult the docs if you need additional fields available
@@ -85,6 +96,7 @@ pub struct MergeRequest {
     pub iid: u64,
     pub title: String,
     pub description: Option<String>,
+    pub source_branch: String,
     pub state: String,
     pub web_url: String,
 }

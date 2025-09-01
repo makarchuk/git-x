@@ -1,5 +1,6 @@
 #![warn(unused_extern_crates)]
 
+mod checkout;
 mod client;
 mod config;
 mod submit;
@@ -26,6 +27,7 @@ pub struct MR {
 enum Subcommand {
     Submit(submit::SubmitArgs),
     View,
+    Checkout(checkout::CheckoutArgs),
 }
 
 pub fn mr(mr: &MR) -> TResult<String> {
@@ -36,6 +38,9 @@ pub fn mr(mr: &MR) -> TResult<String> {
     match &mr.command {
         Subcommand::Submit(submit_args) => submit::execute_submit(&git_context, submit_args),
         Subcommand::View => view::execute_view(&git_context),
+        Subcommand::Checkout(checkout_args) => {
+            checkout::execute_checkout(&git_context, checkout_args)
+        }
     }
 }
 

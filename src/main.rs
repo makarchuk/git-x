@@ -21,6 +21,8 @@ fn main() {
         _ => {}
     }
 
+    crate::log_debug!("Parsed args {:#?}", &cli);   
+
     match &cli.commands {
         Command::Main => match git::main::main() {
             Ok(output) => println!("{}", output),
