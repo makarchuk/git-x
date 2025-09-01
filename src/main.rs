@@ -21,10 +21,10 @@ fn main() {
         _ => {}
     }
 
-    crate::log_debug!("Parsed args {:#?}", &cli);   
+    crate::log_debug!("Parsed args {:#?}", &cli);
 
     match &cli.commands {
-        Command::Main => match git::main::main() {
+        Command::Main => match git::main::execute_main() {
             Ok(output) => println!("{}", output),
             Err(err) => {
                 println!("Failed: {}", err.print());
@@ -32,6 +32,13 @@ fn main() {
             }
         },
         Command::MR(mr) => match gitlab::mr(mr) {
+            Ok(output) => println!("{}", output),
+            Err(err) => {
+                println!("Failed: {}", err.print());
+                exit(1);
+            }
+        },
+        Command::Fresh => match git::fresh::execute_fresh() {
             Ok(output) => println!("{}", output),
             Err(err) => {
                 println!("Failed: {}", err.print());
@@ -64,5 +71,6 @@ struct GlobalConfig {
 #[derive(Debug, clap::Subcommand)]
 enum Command {
     Main,
+    Fresh,
     MR(gitlab::MR),
 }

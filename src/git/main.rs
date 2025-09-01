@@ -1,7 +1,7 @@
 use crate::errors::*;
 use crate::git::cmd::GitCommand;
 
-pub fn main() -> TResult<String> {
+pub fn get_main_branch() -> TResult<String> {
     //works much faster, but not always present if repo created locally
     match GitCommand::new(["symbolic-ref", "refs/remotes/origin/HEAD"])?.execute() {
         Ok(output) => match output.strip_prefix("refs/remotes/origin/") {
@@ -25,4 +25,8 @@ pub fn main() -> TResult<String> {
             stdout
         )))?
         .to_owned())
+}
+
+pub fn execute_main() -> TResult<String> {
+    get_main_branch()
 }
