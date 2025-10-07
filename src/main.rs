@@ -31,14 +31,28 @@ fn main() {
                 exit(1);
             }
         },
-        Command::MR(mr) => match gitlab::mr(mr) {
+        Command::Fresh => match git::fresh::execute_fresh() {
             Ok(output) => println!("{}", output),
             Err(err) => {
                 println!("Failed: {}", err.print());
                 exit(1);
             }
         },
-        Command::Fresh => match git::fresh::execute_fresh() {
+        Command::Up => match git::up::execute_up() {
+            Ok(output) => println!("{}", output),
+            Err(err) => {
+                println!("Failed: {}", err.print());
+                exit(1);
+            }
+        },
+        Command::Fix => match git::fix::execute_fix() {
+            Ok(output) => println!("{}", output),
+            Err(err) => {
+                println!("Failed: {}", err.print());
+                exit(1);
+            }
+        },
+        Command::MR(mr) => match gitlab::mr(mr) {
             Ok(output) => println!("{}", output),
             Err(err) => {
                 println!("Failed: {}", err.print());
@@ -72,5 +86,7 @@ struct GlobalConfig {
 enum Command {
     Main,
     Fresh,
+    Up,
+    Fix,
     MR(gitlab::MR),
 }

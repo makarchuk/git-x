@@ -5,6 +5,8 @@ use crate::git::cmd::GitCommand;
 pub struct SubmitArgs {
     #[clap(short, long, required = true)]
     message: String,
+    #[clap(long, default_value = "false")]
+    nodraft: bool,
 }
 
 pub fn execute_submit(
@@ -20,9 +22,16 @@ pub fn execute_submit(
     _ = GitCommand::new(["checkout", "-b", &new_branch_name])?.execute()?;
     _ = GitCommand::new(["commit", "-m", &submit_args.message])?.execute()?;
     _ = GitCommand::new(["push", "--set-upstream", "origin", &new_branch_name])?.execute()?;
+
+    let mr_message = if !submit_args.nodraft {
+        format!("Draft: {}", submit_args.message)
+    } else {
+        submit_args.message.clone()
+    };
+
     let mr = git_context
         .gitlab_client
-        .create_merge_request(&new_branch_name, &submit_args.message)?;
+        .create_merge_request(&new_branch_name, &mr_message)?;
     Ok(format!(
         "Create new Merge Request!\n{} `{}` \n{}",
         mr.id, mr.title, mr.web_url
