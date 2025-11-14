@@ -70,6 +70,9 @@ impl BranchNameTemplate {
     }
 
     fn sanitize_branch_name(&self, msg: &str) -> String {
-        msg.replace(" ", "-").replace("/", "-").to_lowercase()
+        msg.replace(
+            |c: char| !c.is_ascii_alphanumeric() && c != '-' && c != '_',
+            "-",
+        )
     }
 }
