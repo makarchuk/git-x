@@ -3,6 +3,7 @@
 mod checkout;
 mod client;
 mod config;
+mod select;
 mod submit;
 mod view;
 
@@ -28,6 +29,7 @@ enum Subcommand {
     Submit(submit::SubmitArgs),
     View,
     Checkout(checkout::CheckoutArgs),
+    Select,
 }
 
 pub fn mr(mr: &MR) -> TResult<String> {
@@ -41,6 +43,7 @@ pub fn mr(mr: &MR) -> TResult<String> {
         Subcommand::Checkout(checkout_args) => {
             checkout::execute_checkout(&git_context, checkout_args)
         }
+        Subcommand::Select => select::execute_select(&git_context),
     }
 }
 

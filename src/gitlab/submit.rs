@@ -1,5 +1,6 @@
 use crate::errors::TResult;
 use crate::git::cmd::GitCommand;
+use crate::gitlab::client;
 
 #[derive(Debug, clap::Args)]
 pub struct SubmitArgs {
@@ -31,7 +32,12 @@ pub fn execute_submit(
 
     let mr = git_context
         .gitlab_client
-        .create_merge_request(&new_branch_name, &mr_message)?;
+        .create_merge_request(client::MrCreateOptions {
+            source_branch: new_branch_name.clone(),
+            target_branch: "trunk".to_string(),
+            title: mr_message,
+            delete_source_branch: true,
+        })?;
     Ok(format!(
         "Create new Merge Request!\n{} `{}` \n{}",
         mr.id, mr.title, mr.web_url

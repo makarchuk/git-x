@@ -1,4 +1,5 @@
 use gitlab::api::Query;
+use gitlab::api::projects::merge_requests as mr_api;
 
 use crate::{
     errors::{TResult, ToGeneric},
@@ -31,25 +32,32 @@ impl GitlabProjectClient {
     }
 }
 
+#[derive(Debug, Default)]
+pub struct MrCreateOptions {
+    pub source_branch: String,
+    pub target_branch: String,
+    pub title: String,
+    pub delete_source_branch: bool,
+}
+
 impl GitlabProjectClient {
-    pub fn create_merge_request(&self, branch: &str, title: &str) -> TResult<MergeRequest> {
-        let mr: CreateMergeRequestResponse =
-            gitlab::api::projects::merge_requests::CreateMergeRequest::builder()
-                .project(&self.project)
-                .source_branch(branch)
-                //TODO: pass target branch here
-                .target_branch("trunk")
-                .title(title)
-                .build()
-                .with_comment("failed to build create merge request API call")?
-                .query(&self.client)
-                .with_comment("failed to create merge request")?;
+    pub fn create_merge_request(&self, options: MrCreateOptions) -> TResult<MergeRequest> {
+        let mr: CreateMergeRequestResponse = mr_api::CreateMergeRequest::builder()
+            .project(&self.project)
+            .source_branch(&options.source_branch)
+            .target_branch(&options.target_branch)
+            .title(&options.title)
+            .remove_source_branch(options.delete_source_branch)
+            .build()
+            .with_comment("failed to build create merge request API call")?
+            .query(&self.client)
+            .with_comment("failed to create merge request")?;
         Ok(mr.mr)
     }
 
     pub fn get_merge_requestse_by_branch(&self, branch: &str) -> TResult<Vec<MergeRequest>> {
         let mrs: Vec<ListMergeRequestsResponseItem> = gitlab::api::paged(
-            gitlab::api::projects::merge_requests::MergeRequests::builder()
+            mr_api::MergeRequests::builder()
                 .project(&self.project)
                 .source_branch(branch)
                 .build()
@@ -63,7 +71,7 @@ impl GitlabProjectClient {
     }
 
     pub fn get_merge_request(&self, mr: u64) -> TResult<MergeRequest> {
-        let mr: MergeRequest = gitlab::api::projects::merge_requests::MergeRequest::builder()
+        let mr: MergeRequest = mr_api::MergeRequest::builder()
             .project(&self.project)
             .merge_request(mr)
             .build()
@@ -72,6 +80,45 @@ impl GitlabProjectClient {
             .with_comment("failed to get merge request")?;
         Ok(mr)
     }
+
+    pub fn get_merge_requests(&self, filter: GetMergeRequestsFilter) -> TResult<Vec<MergeRequest>> {
+        let mut builder = mr_api::MergeRequests::builder();
+        let mut request = builder.project(&self.project);
+
+        if let Some(author) = filter.author {
+            match author {
+                MergeRequestFilterAuthor::Username(username) => {
+                    request = request.author(username);
+                }
+                MergeRequestFilterAuthor::Me => {
+                    request = request.scope(mr_api::MergeRequestScope::CreatedByMe);
+                }
+            }
+        }
+        if filter.opened_only {
+            request = request.state(mr_api::MergeRequestState::Opened);
+        }
+
+        let mrs: Vec<ListMergeRequestsResponseItem> = gitlab::api::paged(
+            builder
+                .build()
+                .with_comment("failed to build get merge requests API call")?,
+            gitlab::api::Pagination::Limit(200),
+        )
+        .query(&self.client)
+        .with_comment("failed to get merge requests")?;
+        Ok(mrs.into_iter().map(|mr| mr.mr).collect())
+    }
+}
+
+pub struct GetMergeRequestsFilter {
+    pub author: Option<MergeRequestFilterAuthor>,
+    pub opened_only: bool,
+}
+
+pub enum MergeRequestFilterAuthor {
+    Username(String),
+    Me,
 }
 
 //Very much incomplete structure. Consult the docs if you need additional fields available
