@@ -100,7 +100,7 @@ impl GitlabProjectClient {
         }
 
         let mrs: Vec<ListMergeRequestsResponseItem> = gitlab::api::paged(
-            builder
+            request
                 .build()
                 .with_comment("failed to build get merge requests API call")?,
             gitlab::api::Pagination::Limit(200),
@@ -117,6 +117,7 @@ pub struct GetMergeRequestsFilter {
 }
 
 pub enum MergeRequestFilterAuthor {
+    #[allow(dead_code)]
     Username(String),
     Me,
 }
@@ -142,6 +143,7 @@ pub struct MergeRequest {
     pub id: u64,
     pub iid: u64,
     pub title: String,
+    #[allow(dead_code)]
     pub description: Option<String>,
     pub source_branch: String,
     pub state: String,
