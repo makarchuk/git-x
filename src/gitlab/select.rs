@@ -12,35 +12,44 @@ pub fn execute_select(ctx: &crate::gitlab::GitContext) -> TResult<String> {
             opened_only: true,
         })?;
 
-    if mrs.is_empty() {
-        ratatui::restore();
-        return Ok("No open merge requests found for your user.".to_string());
-    }
-
-    let result = RatatuiApp::new(mrs).run(&mut terminal);
+    let result = RatatuiApp::new(&ctx.gitlab_client, mrs).run(&mut terminal);
     ratatui::restore();
     result
 }
 
-struct RatatuiApp {
+struct RatatuiApp<'a> {
+    gitlab_client: &'a gitlab::client::GitlabProjectClient,
     mrs: Vec<gitlab::client::MergeRequest>,
     visible: Vec<usize>,
     state: ratatui::widgets::TableState,
     status: Option<String>,
     checkout: Option<CheckoutState>,
+    input: Option<InputState>,
+    author_label: String,
 }
 
-impl RatatuiApp {
-    fn new(mrs: Vec<gitlab::client::MergeRequest>) -> Self {
+impl<'a> RatatuiApp<'a> {
+    fn new(
+        gitlab_client: &'a gitlab::client::GitlabProjectClient,
+        mrs: Vec<gitlab::client::MergeRequest>,
+    ) -> Self {
+        let has_mrs = !mrs.is_empty();
         let visible: Vec<usize> = (0..mrs.len()).collect();
         let mut state = ratatui::widgets::TableState::default();
-        state.select(Some(0));
+        state.select(if has_mrs { Some(0) } else { None });
         Self {
+            gitlab_client,
             mrs,
             visible,
             state,
-            status: None,
+            status: if has_mrs {
+                None
+            } else {
+                Some("No open merge requests found for your user.".to_string())
+            },
             checkout: None,
+            input: None,
+            author_label: "me".to_string(),
         }
     }
 
@@ -66,6 +75,12 @@ impl RatatuiApp {
                 UiAction::Cancel => return Ok("Selection cancelled.".to_string()),
                 UiAction::StartCheckout(idx) => {
                     self.start_checkout(idx);
+                }
+                UiAction::OpenInBrowser(idx) => {
+                    self.open_in_browser(idx);
+                }
+                UiAction::FilterAuthor(query) => {
+                    self.load_author_mrs(terminal, &query)?;
                 }
             }
         }
@@ -104,7 +119,7 @@ impl RatatuiApp {
                 .block(
                     ratatui::widgets::Block::default()
                         .borders(ratatui::widgets::Borders::ALL)
-                        .title("Merge Requests"),
+                        .title(format!("Merge Requests ({})", self.author_label)),
                 )
                 .highlight_symbol(">> ")
                 .row_highlight_style(
@@ -135,6 +150,7 @@ impl RatatuiApp {
                     return Ok(UiAction::None);
                 }
                 match key.code {
+                    _ if self.input.is_some() => self.handle_author_input(key.code),
                     ratatui::crossterm::event::KeyCode::Char('q')
                     | ratatui::crossterm::event::KeyCode::Esc => Ok(UiAction::Cancel),
                     ratatui::crossterm::event::KeyCode::Down
@@ -156,6 +172,18 @@ impl RatatuiApp {
                             Some(idx) => UiAction::StartCheckout(idx),
                             None => UiAction::None,
                         })
+                    }
+                    ratatui::crossterm::event::KeyCode::Char('v') => {
+                        let idx = self.selected_mr_idx();
+                        Ok(match idx {
+                            Some(idx) => UiAction::OpenInBrowser(idx),
+                            None => UiAction::None,
+                        })
+                    }
+                    ratatui::crossterm::event::KeyCode::Char('a') => {
+                        self.input = Some(InputState::default());
+                        self.status = None;
+                        Ok(UiAction::None)
                     }
                     _ => Ok(UiAction::None),
                 }
@@ -182,9 +210,12 @@ impl RatatuiApp {
     }
 
     fn help_text(&self) -> String {
+        if let Some(input) = &self.input {
+            return format!("Author email or username: {}_", input.value);
+        }
         match &self.status {
             Some(status) => status.clone(),
-            None => "Up/Down or j/k to move, Enter to checkout, q/Esc to cancel".to_string(),
+            None => "Up/Down or j/k to move, Enter to checkout, v to view, a to filter author, q/Esc to cancel".to_string(),
         }
     }
 
@@ -226,6 +257,100 @@ impl RatatuiApp {
             receiver: rx,
         });
         self.set_status("Checking out selected MR...");
+    }
+
+    fn open_in_browser(&mut self, mr_idx: usize) {
+        let mr = &self.mrs[mr_idx];
+        match open::that(&mr.web_url) {
+            Ok(()) => self.set_status(&format!("Opening MR !{}: {}", mr.iid, mr.web_url)),
+            Err(e) => self.set_status(&format!(
+                "Failed to open MR !{} in browser: {} ({})",
+                mr.iid, mr.web_url, e
+            )),
+        }
+    }
+
+    fn load_author_mrs(
+        &mut self,
+        terminal: &mut ratatui::Terminal<ratatui::backend::CrosstermBackend<std::io::Stdout>>,
+        query: &str,
+    ) -> TResult<()> {
+        let query = query.trim();
+        if query.is_empty() {
+            return Ok(());
+        }
+
+        self.set_status("Loading open merge requests...");
+        self.draw(terminal)?;
+
+        let (username, label) =
+            if let Some(username) = self.gitlab_client.resolve_author_username(query)? {
+                let label = if username.eq_ignore_ascii_case(query) {
+                    username.clone()
+                } else {
+                    format!("{} ({})", query, username)
+                };
+                (username, label)
+            } else {
+                (query.to_string(), query.to_string())
+            };
+
+        self.mrs =
+            self.gitlab_client
+                .get_merge_requests(gitlab::client::GetMergeRequestsFilter {
+                    author: Some(gitlab::client::MergeRequestFilterAuthor::Username(username)),
+                    opened_only: true,
+                })?;
+        self.visible = (0..self.mrs.len()).collect();
+        self.state
+            .select(if self.mrs.is_empty() { None } else { Some(0) });
+        self.author_label = label;
+        if self.mrs.is_empty() {
+            self.set_status("No open merge requests found for this author.");
+        } else {
+            self.status = None;
+        }
+        Ok(())
+    }
+
+    fn selected_mr_idx(&self) -> Option<usize> {
+        self.state
+            .selected()
+            .and_then(|i| self.visible.get(i).copied())
+    }
+
+    fn handle_author_input(
+        &mut self,
+        key_code: ratatui::crossterm::event::KeyCode,
+    ) -> TResult<UiAction> {
+        let Some(input) = &mut self.input else {
+            return Ok(UiAction::None);
+        };
+
+        match key_code {
+            ratatui::crossterm::event::KeyCode::Esc => {
+                self.input = None;
+                Ok(UiAction::None)
+            }
+            ratatui::crossterm::event::KeyCode::Enter => {
+                let value = input.value.trim().to_string();
+                self.input = None;
+                if value.is_empty() {
+                    Ok(UiAction::None)
+                } else {
+                    Ok(UiAction::FilterAuthor(value))
+                }
+            }
+            ratatui::crossterm::event::KeyCode::Backspace => {
+                input.value.pop();
+                Ok(UiAction::None)
+            }
+            ratatui::crossterm::event::KeyCode::Char(value) => {
+                input.value.push(value);
+                Ok(UiAction::None)
+            }
+            _ => Ok(UiAction::None),
+        }
     }
 
     fn poll_checkout(&mut self) -> TResult<Option<TResult<String>>> {
@@ -270,10 +395,17 @@ struct CheckoutState {
     receiver: std::sync::mpsc::Receiver<TResult<String>>,
 }
 
+#[derive(Default)]
+struct InputState {
+    value: String,
+}
+
 enum UiAction {
     None,
     Cancel,
     StartCheckout(usize),
+    OpenInBrowser(usize),
+    FilterAuthor(String),
 }
 
 const SPINNER_FRAMES: [&str; 4] = ["|", "/", "-", "\\"];
@@ -290,96 +422,4 @@ fn checkout_mr_info(mr: CheckoutInfo) -> TResult<String> {
         "Checked out to branch `{}` for MR !{} `{}`\nView Merge Request in Browser: {}",
         mr.source_branch, mr.iid, mr.title, mr.web_url
     ))
-}
-
-fn draw_table(
-    terminal: &mut ratatui::Terminal<ratatui::backend::CrosstermBackend<std::io::Stdout>>,
-    mrs: &[gitlab::client::MergeRequest],
-    state: &mut ratatui::widgets::TableState,
-) -> TResult<()> {
-    terminal
-        .draw(|frame| {
-            let rows = mrs.iter().map(|mr| {
-                ratatui::widgets::Row::new(vec![
-                    mr.iid.to_string(),
-                    mr.title.clone(),
-                    mr.state.as_str().to_string(),
-                ])
-            });
-
-            let table = ratatui::widgets::Table::new(
-                rows,
-                vec![
-                    ratatui::layout::Constraint::Length(6),
-                    ratatui::layout::Constraint::Min(20),
-                    ratatui::layout::Constraint::Length(10),
-                ],
-            )
-            .header(
-                ratatui::widgets::Row::new(vec!["IID", "Title", "State"]).style(
-                    ratatui::style::Style::default()
-                        .add_modifier(ratatui::style::Modifier::BOLD),
-                ),
-            )
-            .block(
-                ratatui::widgets::Block::default()
-                    .borders(ratatui::widgets::Borders::ALL)
-                    .title("Merge Requests"),
-            )
-            .highlight_symbol(">> ")
-            .row_highlight_style(
-                ratatui::style::Style::default()
-                    .add_modifier(ratatui::style::Modifier::REVERSED),
-            );
-
-            let chunks = ratatui::layout::Layout::default()
-                .direction(ratatui::layout::Direction::Vertical)
-                .constraints([
-                    ratatui::layout::Constraint::Min(1),
-                    ratatui::layout::Constraint::Length(1),
-                ])
-                .split(frame.area());
-
-            frame.render_stateful_widget(table, chunks[0], state);
-            let help = ratatui::widgets::Paragraph::new(
-                "Up/Down or j/k to move, Enter to checkout, q/Esc to cancel",
-            );
-            frame.render_widget(help, chunks[1]);
-        })
-        .to_generic()?;
-    Ok(())
-}
-
-fn handle_input(
-    total: usize,
-    state: &mut ratatui::widgets::TableState,
-) -> TResult<Option<Option<usize>>> {
-    match ratatui::crossterm::event::read().to_generic()? {
-        ratatui::crossterm::event::Event::Key(key) => {
-            if key.kind != ratatui::crossterm::event::KeyEventKind::Press {
-                return Ok(None);
-            }
-            match key.code {
-                ratatui::crossterm::event::KeyCode::Char('q')
-                | ratatui::crossterm::event::KeyCode::Esc => Ok(Some(None)),
-                ratatui::crossterm::event::KeyCode::Down
-                | ratatui::crossterm::event::KeyCode::Char('j') => {
-                    let idx = state.selected().unwrap_or(0);
-                    let next = if idx + 1 >= total { 0 } else { idx + 1 };
-                    state.select(Some(next));
-                    Ok(None)
-                }
-                ratatui::crossterm::event::KeyCode::Up
-                | ratatui::crossterm::event::KeyCode::Char('k') => {
-                    let idx = state.selected().unwrap_or(0);
-                    let next = if idx == 0 { total - 1 } else { idx - 1 };
-                    state.select(Some(next));
-                    Ok(None)
-                }
-                ratatui::crossterm::event::KeyCode::Enter => Ok(Some(state.selected())),
-                _ => Ok(None),
-            }
-        }
-        _ => Ok(None),
-    }
 }

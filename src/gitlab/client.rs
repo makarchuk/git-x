@@ -1,5 +1,6 @@
 use gitlab::api::Query;
 use gitlab::api::projects::merge_requests as mr_api;
+use gitlab::api::users as user_api;
 
 use crate::{
     errors::{TResult, ToGeneric},
@@ -109,6 +110,45 @@ impl GitlabProjectClient {
         .with_comment("failed to get merge requests")?;
         Ok(mrs.into_iter().map(|mr| mr.mr).collect())
     }
+
+    pub fn resolve_author_username(&self, query: &str) -> TResult<Option<String>> {
+        let username_matches: Vec<UserSearchResponseItem> = gitlab::api::paged(
+            user_api::Users::builder()
+                .username(query)
+                .build()
+                .with_comment("failed to build get users API call")?,
+            gitlab::api::Pagination::Limit(2),
+        )
+        .query(&self.client)
+        .with_comment("failed to get user by username")?;
+
+        if let Some(user) = username_matches
+            .iter()
+            .find(|user| user.username.eq_ignore_ascii_case(query))
+        {
+            return Ok(Some(user.username.clone()));
+        }
+
+        let search_matches: Vec<UserSearchResponseItem> = gitlab::api::paged(
+            user_api::Users::builder()
+                .search(query)
+                .build()
+                .with_comment("failed to build get users API call")?,
+            gitlab::api::Pagination::Limit(20),
+        )
+        .query(&self.client)
+        .with_comment("failed to search users")?;
+
+        let exact_match = search_matches.iter().find(|user| user.matches_query(query));
+        let user = exact_match.or_else(|| {
+            if search_matches.len() == 1 {
+                search_matches.first()
+            } else {
+                None
+            }
+        });
+        Ok(user.map(|user| user.username.clone()))
+    }
 }
 
 pub struct GetMergeRequestsFilter {
@@ -136,6 +176,31 @@ struct CreateMergeRequestResponse {
 struct ListMergeRequestsResponseItem {
     #[serde(flatten)]
     mr: MergeRequest,
+}
+
+#[derive(serde::Deserialize, Debug)]
+struct UserSearchResponseItem {
+    username: String,
+    email: Option<String>,
+    public_email: Option<String>,
+    commit_email: Option<String>,
+}
+
+impl UserSearchResponseItem {
+    fn matches_query(&self, query: &str) -> bool {
+        self.username.eq_ignore_ascii_case(query) || self.matches_email(query)
+    }
+
+    fn matches_email(&self, email: &str) -> bool {
+        [
+            self.email.as_ref(),
+            self.public_email.as_ref(),
+            self.commit_email.as_ref(),
+        ]
+        .into_iter()
+        .flatten()
+        .any(|value| value.eq_ignore_ascii_case(email))
+    }
 }
 
 #[derive(serde::Deserialize, Debug)]
